@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>NavIL — ניווט חינמי</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;900&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;font-family:'Heebo',sans-serif;background:#0a0f1e;color:#fff;overflow:hidden;direction:rtl}
+#app{position:fixed;inset:0;display:flex;flex-direction:column}
+#map{flex:1;position:relative;z-index:1}
+.leaflet-container{background:#0a0f1e!important}
+.leaflet-tile{filter:brightness(0.38) saturate(0.5) hue-rotate(185deg)}
+.leaflet-control-zoom,.leaflet-control-attribution{display:none!important}
+
+#topbar{position:absolute;top:0;left:0;right:0;z-index:100;padding:12px 12px 0;pointer-events:none}
+.topbar-inner{pointer-events:all;display:flex;gap:8px;align-items:flex-start}
+.search-wrap{flex:1;background:rgba(12,18,38,0.97);border:1px solid rgba(0,212,255,0.2);border-radius:16px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);backdrop-filter:blur(20px)}
+.search-row{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.s-icon{color:#00d4ff;font-size:16px;flex-shrink:0}
+#search-input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:14px;font-family:'Heebo',sans-serif;direction:rtl}
+#search-input::placeholder{color:rgba(255,255,255,0.28)}
+#clear-btn{background:none;border:none;color:rgba(255,255,255,0.25);font-size:18px;cursor:pointer;display:none;padding:0;font-family:'Heebo',sans-serif}
+#search-results{border-top:1px solid rgba(255,255,255,0.05);max-height:260px;overflow-y:auto;display:none}
+#search-results.show{display:block}
+.r-item{padding:12px 14px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;display:flex;align-items:center;gap:10px}
+.r-item:active{background:rgba(0,212,255,0.08)}
+.r-icon{width:34px;height:34px;border-radius:10px;background:rgba(0,212,255,0.1);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.r-name{font-size:13px;font-weight:600;color:#fff}
+.r-addr{font-size:10px;color:rgba(255,255,255,0.3);margin-top:1px}
+.r-loading{padding:14px;text-align:center;color:rgba(255,255,255,0.35);font-size:12px}
+.top-btn{width:46px;height:46px;border-radius:14px;flex-shrink:0;border:1px solid rgba(0,212,255,0.2);background:rgba(12,18,38,0.97);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;box-shadow:0 4px 20px rgba(0,0,0,0.4);margin-top:1px}
+.top-btn:active{opacity:0.7}
+
+#bottom-panel{position:absolute;bottom:0;left:0;right:0;z-index:100;padding:0 12px 20px}
+.quick-strip{display:flex;gap:8px;margin-bottom:10px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
+.quick-strip::-webkit-scrollbar{display:none}
+.qbtn{display:flex;align-items:center;gap:6px;flex-shrink:0;background:rgba(12,18,38,0.97);border:1px solid rgba(255,255,255,0.08);border-radius:12px;padding:9px 14px;cursor:pointer;font-size:12px;font-weight:600;color:rgba(255,255,255,0.65);font-family:'Heebo',sans-serif;backdrop-filter:blur(20px)}
+.qbtn:active{border-color:rgba(0,212,255,0.3);color:#00d4ff}
+.home-card{background:rgba(12,18,38,0.97);border:1px solid rgba(0,212,255,0.15);border-radius:20px;padding:16px;backdrop-filter:blur(20px);box-shadow:0 -8px 40px rgba(0,0,0,0.5)}
+.home-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.greeting{font-size:13px;color:rgba(255,255,255,0.4)}
+.clock{font-size:13px;color:rgba(255,255,255,0.4);direction:ltr}
+.go-btn{width:100%;padding:15px;border:none;border-radius:14px;background:linear-gradient(135deg,#00d4ff,#0055ff);color:#fff;font-size:16px;font-weight:800;font-family:'Heebo',sans-serif;cursor:pointer;box-shadow:0 4px 24px rgba(0,212,255,0.3)}
+.go-btn:active{opacity:0.9}
+
+#nav-panel{display:none}
+.nav-card{background:rgba(10,15,30,0.98);border:1px solid rgba(0,212,255,0.2);border-radius:20px;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,0.6)}
+.nav-top{background:linear-gradient(135deg,#003dbb,#00aaff);padding:15px 18px;display:flex;align-items:center;gap:14px}
+.nav-arrow{font-size:36px;flex-shrink:0;line-height:1}
+.nav-info{flex:1}
+.nav-dist{font-size:23px;font-weight:900;line-height:1.1}
+.nav-street{font-size:12px;opacity:0.85;margin-top:4px;line-height:1.4}
+.nav-stats{display:flex;padding:13px 0;border-top:1px solid rgba(255,255,255,0.07)}
+.nst{flex:1;text-align:center}
+.nst:not(:last-child){border-left:1px solid rgba(255,255,255,0.07)}
+.nst-val{font-size:19px;font-weight:800;color:#00d4ff}
+.nst-lbl{font-size:10px;color:rgba(255,255,255,0.38);margin-top:2px}
+.stop-btn{margin:0 14px 13px;padding:12px;border:1px solid rgba(255,68,68,0.3);border-radius:12px;background:rgba(255,68,68,0.08);color:#ff5555;font-size:13px;font-weight:700;font-family:'Heebo',sans-serif;cursor:pointer;width:calc(100% - 28px)}
+.stop-btn:active{background:rgba(255,68,68,0.2)}
+
+#locate-btn{position:absolute;z-index:100;left:12px;bottom:215px;width:46px;height:46px;border-radius:14px;border:1px solid rgba(0,212,255,0.2);background:rgba(12,18,38,0.97);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:20px;box-shadow:0 4px 20px rgba(0,0,0,0.4)}
+#locate-btn:active{opacity:0.7}
+#speed-box{position:absolute;z-index:100;left:12px;top:76px;background:rgba(12,18,38,0.97);border:2px solid rgba(0,212,255,0.35);border-radius:12px;padding:6px 10px;text-align:center;display:none;backdrop-filter:blur(20px)}
+#speed-box.show{display:block}
+.spd{font-size:22px;font-weight:900;color:#00d4ff;line-height:1}
+.spd-unit{font-size:9px;color:rgba(255,255,255,0.3)}
+
+#alert-box{position:absolute;z-index:110;top:76px;left:12px;right:12px;background:rgba(255,160,0,0.12);border:1px solid rgba(255,160,0,0.4);border-radius:13px;padding:11px 14px;display:none;align-items:center;gap:10px;backdrop-filter:blur(20px)}
+#alert-box.show{display:flex}
+.alert-msg{font-size:13px;font-weight:600;color:#ffaa00}
+
+#spinner{position:fixed;inset:0;z-index:200;background:rgba(10,15,30,0.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:14px;backdrop-filter:blur(8px)}
+#spinner.show{display:flex}
+.spin{width:44px;height:44px;border:3px solid rgba(0,212,255,0.15);border-top-color:#00d4ff;border-radius:50%;animation:rot 0.75s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+.spin-txt{font-size:13px;color:rgba(255,255,255,0.4)}
+
+.user-dot{width:18px;height:18px;border-radius:50%;background:#00d4ff;border:3px solid #fff;box-shadow:0 0 0 4px rgba(0,212,255,0.3),0 2px 8px rgba(0,0,0,0.5)}
+.dest-pin{width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:26px solid #ff3355;filter:drop-shadow(0 2px 4px rgba(255,0,50,0.5))}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+
+  <div id="topbar">
+    <div class="topbar-inner">
+      <div class="search-wrap">
+        <div class="search-row">
+          <span class="s-icon">🔍</span>
+          <input id="search-input" type="text" placeholder="חפש יעד — רחוב, עיר, עסק..."/>
+          <button id="clear-btn" onclick="clearSearch()">✕</button>
+        </div>
+        <div id="search-results"></div>
+      </div>
+      <div class="top-btn" onclick="locateMe()">📍</div>
+    </div>
+  </div>
+
+  <div id="speed-box"><div class="spd" id="spd-val">0</div><div class="spd-unit">קמ״ש</div></div>
+  <div id="alert-box"><span style="font-size:18px">⚠️</span><div class="alert-msg" id="alert-msg"></div></div>
+  <div id="locate-btn" onclick="locateMe()">🎯</div>
+  <div id="spinner"><div class="spin"></div><div class="spin-txt" id="spin-txt">טוען...</div></div>
+
+  <div id="bottom-panel">
+    <div id="idle-panel">
+      <div class="quick-strip">
+        <div class="qbtn" onclick="quickSearch('תחנת דלק')">⛽ דלק</div>
+        <div class="qbtn" onclick="quickSearch('מסעדה')">🍽 אוכל</div>
+        <div class="qbtn" onclick="quickSearch('סופרמרקט')">🛒 סופר</div>
+        <div class="qbtn" onclick="quickSearch('בית קפה')">☕ קפה</div>
+        <div class="qbtn" onclick="quickSearch('בית חולים')">🏥 בי״ח</div>
+        <div class="qbtn" onclick="quickSearch('חנייה')">🅿️ חנייה</div>
+      </div>
+      <div class="home-card">
+        <div class="home-row">
+          <div class="greeting" id="greeting">שלום! לאן היום? 👋</div>
+          <div class="clock" id="clock"></div>
+        </div>
+        <button class="go-btn" onclick="focusSearch()">🧭 הזן יעד לניווט</button>
+      </div>
+    </div>
+    <div id="nav-panel">
+      <div class="nav-card">
+        <div class="nav-top">
+          <div class="nav-arrow" id="nav-arrow">⬆️</div>
+          <div class="nav-info">
+            <div class="nav-dist" id="nav-dist">—</div>
+            <div class="nav-street" id="nav-street">מחשב מסלול...</div>
+          </div>
+        </div>
+        <div class="nav-stats">
+          <div class="nst"><div class="nst-val" id="s-eta">—</div><div class="nst-lbl">הגעה</div></div>
+          <div class="nst"><div class="nst-val" id="s-dist">—</div><div class="nst-lbl">מרחק</div></div>
+          <div class="nst"><div class="nst-val" id="s-mins">—</div><div class="nst-lbl">דקות</div></div>
+        </div>
+        <button class="stop-btn" onclick="stopNav()">⏹ עצור ניווט</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Leaflet נטען ראשון, הקוד שלנו רק אחריו -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+var map, userMarker, destMarker, routeLayer, shadowLayer
+var userPos = null
+var isNav = false
+var navSteps = [], stepIdx = 0
+var watchId = null
+var searchTimer = null
+
+// מחכים שהדף יטען לגמרי
+document.addEventListener('DOMContentLoaded', function() {
+  startClock()
+  initMap()
+})
+
+function initMap() {
+  try {
+    map = L.map('map', {
+      center: [32.0853, 34.7818],
+      zoom: 13,
+      zoomControl: false,
+      attributionControl: false
+    })
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      subdomains: ['a','b','c']
+    }).addTo(map)
+
+    setupSearch()
+    locateMe()
+  } catch(e) {
+    showAlert('שגיאה בטעינת המפה — רענן את הדף')
+  }
+}
+
+// ── GPS ──────────────────────────────────────────
+function locateMe() {
+  if (!navigator.geolocation) { showAlert('GPS לא זמין במכשיר זה'); return }
+  showSpinner('מאתר מיקום...')
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      hideSpinner()
+      userPos = [pos.coords.latitude, pos.coords.longitude]
+      setUserMarker(userPos)
+      map.setView(userPos, 15)
+    },
+    function() {
+      hideSpinner()
+      showAlert('לא ניתן לאתר מיקום — אפשר הרשאת GPS')
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  )
+}
+
+function startWatch() {
+  if (watchId) return
+  watchId = navigator.geolocation.watchPosition(
+    function(pos) {
+      userPos = [pos.coords.latitude, pos.coords.longitude]
+      setUserMarker(userPos)
+      if (isNav) {
+        var spd = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0
+        document.getElementById('spd-val').textContent = spd
+        map.setView(userPos, 17)
+        advanceStep()
+      }
+    },
+    null,
+    { enableHighAccuracy: true, maximumAge: 2000 }
+  )
+}
+
+function setUserMarker(ll) {
+  var icon = L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18,18], iconAnchor: [9,9] })
+  if (userMarker) {
+    userMarker.setLatLng(ll)
+  } else {
+    userMarker = L.marker(ll, { icon: icon, zIndexOffset: 1000 }).addTo(map)
+  }
+}
+
+function setDestMarker(ll) {
+  if (destMarker) map.removeLayer(destMarker)
+  var icon = L.divIcon({ className: '', html: '<div class="dest-pin"></div>', iconSize: [20,26], iconAnchor: [10,26] })
+  destMarker = L.marker(ll, { icon: icon }).addTo(map)
+}
+
+// ── SEARCH ───────────────────────────────────────
+function setupSearch() {
+  var inp = document.getElementById('search-input')
+  var res = document.getElementById('search-results')
+
+  inp.addEventListener('input', function() {
+    var q = inp.value.trim()
+    document.getElementById('clear-btn').style.display = q ? 'block' : 'none'
+    clearTimeout(searchTimer)
+    if (!q) { closeResults(); return }
+    searchTimer = setTimeout(function() { doSearch(q) }, 500)
+  })
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.search-wrap')) closeResults()
+  })
+}
+
+function focusSearch() { document.getElementById('search-input').focus() }
+
+function clearSearch() {
+  document.getElementById('search-input').value = ''
+  document.getElementById('clear-btn').style.display = 'none'
+  closeResults()
+}
+
+function closeResults() {
+  document.getElementById('search-results').classList.remove('show')
+}
+
+function quickSearch(q) {
+  document.getElementById('search-input').value = q
+  document.getElementById('clear-btn').style.display = 'block'
+  doSearch(q)
+}
+
+function doSearch(q) {
+  var res = document.getElementById('search-results')
+  res.innerHTML = '<div class="r-loading">מחפש...</div>'
+  res.classList.add('show')
+
+  var c = userPos || [32.0853, 34.7818]
+  var url = 'https://nominatim.openstreetmap.org/search?format=json&q=' +
+    encodeURIComponent(q + ' ישראל') + '&limit=6&accept-language=he&countrycodes=il'
+
+  fetch(url)
+    .then(function(r) { return r.json() })
+    .then(function(data) {
+      if (!data.length) { res.innerHTML = '<div class="r-loading">לא נמצאו תוצאות</div>'; return }
+      var icons = {restaurant:'🍽',fuel:'⛽',hospital:'🏥',hotel:'🏨',school:'🏫',bank:'🏦',park:'🌳',supermarket:'🛒',cafe:'☕',parking:'🅿️'}
+      res.innerHTML = data.map(function(p) {
+        var icon = icons[p.type] || icons[p.class] || '📍'
+        var parts = p.display_name.split(',')
+        var name = parts[0].trim()
+        var addr = parts.slice(1,3).join(',').trim()
+        return '<div class="r-item" onclick="selectPlace(' + p.lat + ',' + p.lon + ',\'' + name.replace(/'/g,"\\'") + '\')">' +
+          '<div class="r-icon">' + icon + '</div>' +
+          '<div><div class="r-name">' + name + '</div><div class="r-addr">' + addr + '</div></div></div>'
+      }).join('')
+    })
+    .catch(function() {
+      res.innerHTML = '<div class="r-loading">שגיאה — בדוק חיבור אינטרנט</div>'
+    })
+}
+
+// ── ROUTING ──────────────────────────────────────
+function selectPlace(lat, lng, name) {
+  closeResults()
+  document.getElementById('search-input').value = name
+  var dest = [parseFloat(lat), parseFloat(lng)]
+  setDestMarker(dest)
+
+  if (!userPos) {
+    showAlert('לחץ 📍 לאיתור מיקום תחילה')
+    map.setView(dest, 15)
+    return
+  }
+
+  map.fitBounds([userPos, dest], { padding: [70,70] })
+  showSpinner('מחשב מסלול...')
+
+  var url = 'https://router.project-osrm.org/route/v1/driving/' +
+    userPos[1] + ',' + userPos[0] + ';' + lng + ',' + lat +
+    '?overview=full&geometries=geojson&steps=true'
+
+  fetch(url)
+    .then(function(r) { return r.json() })
+    .then(function(data) {
+      hideSpinner()
+      if (!data.routes || !data.routes.length) { showAlert('לא נמצא מסלול'); return }
+
+      var route = data.routes[0]
+      var coords = route.geometry.coordinates.map(function(c) { return [c[1], c[0]] })
+
+      if (routeLayer) map.removeLayer(routeLayer)
+      if (shadowLayer) map.removeLayer(shadowLayer)
+      shadowLayer = L.polyline(coords, { color:'#0044aa', weight:9, opacity:0.3, lineCap:'round' }).addTo(map)
+      routeLayer  = L.polyline(coords, { color:'#00d4ff', weight:5, opacity:0.9, lineCap:'round' }).addTo(map)
+
+      navSteps = route.legs[0].steps.map(function(s) {
+        return {
+          instruction: hebrewInstruction(s.maneuver, s.name),
+          distance: fmtDist(s.distance),
+          distM: s.distance,
+          type: s.maneuver.type,
+          mod: s.maneuver.modifier || '',
+          ll: [s.maneuver.location[1], s.maneuver.location[0]]
+        }
+      })
+      stepIdx = 0
+
+      var mins = Math.round(route.duration / 60)
+      var eta = new Date(Date.now() + route.duration * 1000)
+      var etaStr = ('0'+eta.getHours()).slice(-2) + ':' + ('0'+eta.getMinutes()).slice(-2)
+
+      document.getElementById('s-eta').textContent = etaStr
+      document.getElementById('s-dist').textContent = fmtDist(route.distance)
+      document.getElementById('s-mins').textContent = mins
+
+      isNav = true
+      document.getElementById('idle-panel').style.display = 'none'
+      document.getElementById('nav-panel').style.display = 'block'
+      document.getElementById('speed-box').classList.add('show')
+      document.getElementById('locate-btn').style.bottom = '260px'
+      updateStep()
+      startWatch()
+      if (userPos) map.setView(userPos, 17)
+    })
+    .catch(function() {
+      hideSpinner()
+      showAlert('שגיאה בחישוב מסלול — בדוק אינטרנט')
+    })
+}
+
+function updateStep() {
+  if (!navSteps.length || stepIdx >= navSteps.length) return
+  var s = navSteps[stepIdx]
+  document.getElementById('nav-arrow').textContent = getArrow(s.type, s.mod)
+  document.getElementById('nav-dist').textContent = s.distance
+  document.getElementById('nav-street').textContent = s.instruction
+}
+
+function advanceStep() {
+  if (!navSteps.length || stepIdx >= navSteps.length - 1 || !userPos) return
+  var next = navSteps[stepIdx + 1].ll
+  var d = haversine(userPos, next)
+  if (d < 30) { stepIdx++; updateStep() }
+  if (stepIdx >= navSteps.length - 1) {
+    showAlert('הגעת ליעד! 🎉', 5000)
+    setTimeout(stopNav, 5000)
+  }
+}
+
+function stopNav() {
+  isNav = false; stepIdx = 0; navSteps = []
+  if (watchId) { navigator.geolocation.clearWatch(watchId); watchId = null }
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null }
+  if (shadowLayer) { map.removeLayer(shadowLayer); shadowLayer = null }
+  if (destMarker) { map.removeLayer(destMarker); destMarker = null }
+  document.getElementById('idle-panel').style.display = 'block'
+  document.getElementById('nav-panel').style.display = 'none'
+  document.getElementById('speed-box').classList.remove('show')
+  document.getElementById('locate-btn').style.bottom = '215px'
+  clearSearch()
+  if (userPos) map.setView(userPos, 15)
+}
+
+// ── UTILS ────────────────────────────────────────
+function getArrow(type, mod) {
+  if (type === 'arrive') return '🏁'
+  if (type === 'depart') return '🚗'
+  if (type === 'roundabout' || type === 'rotary') return '🔄'
+  if (mod.indexOf('uturn') >= 0) return '↩️'
+  if (mod === 'left' || mod === 'sharp left') return '⬅️'
+  if (mod === 'right' || mod === 'sharp right') return '➡️'
+  if (mod === 'slight left') return '↖️'
+  if (mod === 'slight right') return '↗️'
+  return '⬆️'
+}
+
+function hebrewInstruction(m, street) {
+  var n = street || ''
+  var t = { left:'פנה שמאלה', right:'פנה ימינה', 'slight left':'פנה קצת שמאלה', 'slight right':'פנה קצת ימינה', 'sharp left':'פנה חדה שמאלה', 'sharp right':'פנה חדה ימינה', straight:'המשך ישר', uturn:'פניית פרסה' }
+  if (m.type === 'arrive') return 'הגעת ליעד! 🎉'
+  if (m.type === 'depart') return 'צא' + (n ? ' מ' + n : '')
+  if (m.type === 'roundabout' || m.type === 'rotary') return 'היכנס לכיכר'
+  var base = t[m.modifier] || 'המשך ישר'
+  return n ? base + ' ל' + n : base
+}
+
+function fmtDist(m) {
+  if (m < 1000) return Math.round(m) + " מ'"
+  return (m / 1000).toFixed(1) + ' ק"מ'
+}
+
+function haversine(a, b) {
+  var R = 6371000
+  var dLat = (b[0]-a[0]) * Math.PI / 180
+  var dLng = (b[1]-a[1]) * Math.PI / 180
+  var x = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(a[0]*Math.PI/180)*Math.cos(b[0]*Math.PI/180)*Math.sin(dLng/2)*Math.sin(dLng/2)
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x))
+}
+
+function showSpinner(t) { document.getElementById('spin-txt').textContent = t || 'טוען...'; document.getElementById('spinner').classList.add('show') }
+function hideSpinner() { document.getElementById('spinner').classList.remove('show') }
+
+var alertTimer
+function showAlert(msg, dur) {
+  clearTimeout(alertTimer)
+  document.getElementById('alert-msg').textContent = msg
+  document.getElementById('alert-box').classList.add('show')
+  alertTimer = setTimeout(function() { document.getElementById('alert-box').classList.remove('show') }, dur || 3500)
+}
+
+function startClock() {
+  function update() {
+    var n = new Date()
+    var h = ('0'+n.getHours()).slice(-2), m = ('0'+n.getMinutes()).slice(-2)
+    document.getElementById('clock').textContent = h + ':' + m
+    document.getElementById('greeting').textContent = n.getHours() < 12 ? 'בוקר טוב! 🌅' : n.getHours() < 17 ? 'צהריים טובים! ☀️' : 'ערב טוב! 🌙'
+  }
+  update(); setInterval(update, 15000)
+}
+</script>
+</body>
+</html>
